@@ -38,8 +38,8 @@ sudo apt update
 sudo apt install -y git
 
 # 2. Clone repository
-git clone https://github.com/Baslocal/Wyze_Guardi.git
-cd Wyze_Guardi
+git clone https://github.com/Baslocal/WyzeGuardi.git
+cd WyzeGuardi
 
 # 3. Run automated installer
 bash install.sh
@@ -63,8 +63,8 @@ sudo apt update
 sudo apt install -y python3 python3-pip python3-venv build-essential python3-dev libffi-dev libssl-dev
 
 # 2. Clone repository
-git clone https://github.com/Baslocal/Wyze_Guardi.git
-cd Wyze_Guardi
+git clone https://github.com/Baslocal/WyzeGuardi.git
+cd WyzeGuardi
 
 # 3. Create virtual environment
 python3 -m venv venv
@@ -410,8 +410,8 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- **Issues**: https://github.com/Baslocal/Wyze_Guardi/issues
-- **Discussions**: https://github.com/Baslocal/Wyze_Guardi/discussions
+- **Issues**: https://github.com/Baslocal/WyzeGuardi/issues
+- **Discussions**: https://github.com/Baslocal/WyzeGuardi/discussions
 
 ## Acknowledgments
 
