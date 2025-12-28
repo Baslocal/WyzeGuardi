@@ -1,0 +1,17 @@
+[Unit]
+Description=WyzeGuardi Camera Automation
+After=network.target
+
+[Service]
+Type=simple
+User=REPLACE_WITH_YOUR_USERNAME
+WorkingDirectory=REPLACE_WITH_FULL_PATH_TO_WYZEGUARDI
+EnvironmentFile=REPLACE_WITH_FULL_PATH_TO_WYZEGUARDI/.env
+ExecStart=REPLACE_WITH_FULL_PATH_TO_WYZEGUARDI/venv/bin/python3 REPLACE_WITH_FULL_PATH_TO_WYZEGUARDI/server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

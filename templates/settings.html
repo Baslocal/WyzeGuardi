@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Settings & Operations - WyzeGuardi{% endblock %}
+
+{% block content %}
+<div class="settings">
+    <h1>Settings & Operational Overview</h1>
+
+    <!-- System Health Overview -->
+    <div class="card">
+        <h2>System Health</h2>
+        <div class="health-grid">
+            <div class="health-item">
+                <h3>Database</h3>
+                <div class="health-details">
+                    <p><strong>Status:</strong> <span class="pill pill-{{ 'green' if db_health.connected else 'red' }}">{{ 'Connected' if db_health.connected else 'Disconnected' }}</span></p>
+                    <p><strong>Response Time:</strong> {{ db_health.response_time_ms }}ms</p>
+                    <p><strong>File Size:</strong> {{ db_health.file_size_mb }} MB</p>
+                </div>
+            </div>
+
+            <div class="health-item">
+                <h3>Wyze API</h3>
+                <div class="health-details">
+                    <p><strong>Uptime (24h):</strong> {{ '%.1f'|format(api_stats.uptime_percent or 0) }}%</p>
+                    <p><strong>Avg Response:</strong> {{ api_stats.average_response_time_ms or 'N/A' }}ms</p>
+                    <p><strong>Last Success:</strong> {{ api_stats.last_successful_call[:19] if api_stats.last_successful_call else 'Never' }}</p>
+                </div>
+            </div>
+
+            <div class="health-item">
+                <h3>Heartbeats</h3>
+                <div class="health-details">
+                    <p><strong>Count (24h):</strong> {{ heartbeat_stats.count }}</p>
+                    <p><strong>Last Received:</strong> {{ heartbeat_stats.last_heartbeat[:19] if heartbeat_stats.last_heartbeat else 'Never' }}</p>
+                    <p><strong>Avg Interval:</strong> {{ '%.1f'|format(heartbeat_stats.average_interval_minutes) if heartbeat_stats.average_interval_minutes else 'N/A' }} min</p>
+                </div>
+            </div>
+
+            <div class="health-item">
+                <h3>System Resources</h3>
+                <div class="health-details">
+                    <p><strong>CPU:</strong> {{ '%.1f'|format(system_resources.cpu_percent) }}%</p>
+                    <p><strong>Memory:</strong> {{ '%.1f'|format(system_resources.memory.percent) }}% ({{ '%.0f'|format(system_resources.memory.used / 1024 / 1024) }} MB used)</p>
+                    <p><strong>Disk:</strong> {{ '%.1f'|format(system_resources.disk.percent) }}% ({{ '%.1f'|format(system_resources.disk.free / 1024 / 1024 / 1024) }} GB free)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Statistics -->
+    <div class="card">
+        <h2>Historical Statistics (Last 24 Hours)</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <h3>Camera Toggles</h3>
+                <p class="stat-number">{{ camera_stats.total_toggles }}</p>
+                <div class="stat-breakdown">
+                    <p><strong>Manual:</strong> {{ camera_stats.by_trigger_type.manual or 0 }}</p>
+                    <p><strong>Presence:</strong> {{ camera_stats.by_trigger_type.presence or 0 }}</p>
+                    <p><strong>Schedule:</strong> {{ camera_stats.by_trigger_type.schedule or 0 }}</p>
+                </div>
+                <p><strong>Success Rate:</strong> {{ '%.1f'|format(camera_stats.success_rate_percent) }}%</p>
+            </div>
+
+            <div class="stat-item">
+                <h3>State Transitions</h3>
+                <p class="stat-number">{{ state_stats.total_transitions }}</p>
+                <div class="stat-breakdown">
+                    {% for mode, count in state_stats.by_mode.items() %}
+                    <p><strong>{{ mode }}:</strong> {{ count }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="stat-item">
+                <h3>Heartbeats</h3>
+                <p class="stat-number">{{ heartbeat_stats.count }}</p>
+                <p><strong>Average Interval:</strong> {{ '%.1f'|format(heartbeat_stats.average_interval_minutes) if heartbeat_stats.average_interval_minutes else 'N/A' }} min</p>
+            </div>
+
+            <div class="stat-item">
+                <h3>System Uptime</h3>
+                <p class="stat-number">{{ '%.0f'|format(system_resources.uptime_seconds / 3600) }}h</p>
+                <p>{{ '%.1f'|format(system_resources.uptime_seconds / 86400) }} days</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Details -->
+    <div class="card">
+        <h2>Database Details</h2>
+        <table class="details-table">
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th>Row Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for table, count in db_health.table_counts.items() %}
+                <tr>
+                    <td><code>{{ table }}</code></td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="db-summary">
+            <p><strong>Total Size:</strong> {{ db_health.file_size_mb }} MB</p>
+            <p><strong>Last Write:</strong> {{ db_health.last_write[:19] if db_health.last_write else 'Never' }}</p>
+        </div>
+    </div>
+
+    <!-- Configuration Summary -->
+    <div class="card">
+        <h2>Configuration</h2>
+        <table class="config-table">
+            <tbody>
+                <tr>
+                    <td><strong>Timezone:</strong></td>
+                    <td>{{ config.timezone }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Home Threshold:</strong></td>
+                    <td>{{ config.home_threshold }} minutes</td>
+                </tr>
+                <tr>
+                    <td><strong>Away Threshold:</strong></td>
+                    <td>{{ config.away_threshold }} minutes</td>
+                </tr>
+                <tr>
+                    <td><strong>Manual Override Duration:</strong></td>
+                    <td>{{ config.manual_override_duration }} hours</td>
+                </tr>
+                <tr>
+                    <td><strong>Camera Count:</strong></td>
+                    <td>{{ config.camera_count }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="config-note"><em>To change any of these settings, use the Edit button below.</em></p>
+        <div style="margin-top: var(--space-md); display: flex; gap: var(--space-md);">
+            <button onclick="window.location.href='/settings/edit';" class="btn btn-primary">
+                ✏️ Edit All Settings
+            </button>
+            <button onclick="if(confirm('This will reset to setup wizard. Current settings will be lost. Continue?')) { window.location.href='/reset-setup'; }" class="btn btn-warning">
+                🔧 Reset to Setup
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 30 seconds
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

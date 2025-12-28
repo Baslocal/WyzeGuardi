@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}Device Management - WyzeGuardi{% endblock %}
+
+{% block content %}
+<div class="devices-page">
+    <h1>Device Management</h1>
+    <p>Manage devices that send heartbeats for presence detection.</p>
+
+    <div class="card">
+        <h2>Registered Devices ({{ devices|length }})</h2>
+
+        {% if devices %}
+            <table class="devices-table">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Connection</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in devices %}
+                    <tr class="device-row {{ 'disabled' if not device.enabled else '' }}" data-device-id="{{ device.device_id }}">
+                        <td class="device-info">
+                            <div class="device-status-inline">
+                                {% if device.device_id in online_device_ids %}
+                                    <span class="pill pill-green">●</span>
+                                {% else %}
+                                    <span class="pill pill-gray">●</span>
+                                {% endif %}
+                                <strong>{{ device.device_name }}</strong>
+                            </div>
+                            <div class="device-meta">
+                                <code>{{ device.device_id[:20] }}...</code> · {{ device.device_type }}
+                            </div>
+                        </td>
+                        <td class="connection-info">
+                            <div><strong>Last Seen:</strong> {{ device.last_seen[:19] if device.last_seen else 'Never' }}</div>
+                            <div><strong>Heartbeat:</strong>
+                                {% if device.device_id in last_heartbeats %}
+                                    {{ last_heartbeats[device.device_id][:19] }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </div>
+                            <div><strong>IP:</strong> {{ device.last_ip or 'N/A' }} · <span class="pill pill-blue pill-tiny">{{ device.detection_method or 'both' }}</span></div>
+                        </td>
+                        <td class="status-info">
+                            <span class="pill pill-{{ 'green' if device.enabled else 'red' }}">
+                                {{ 'Enabled' if device.enabled else 'Disabled' }}
+                            </span>
+                        </td>
+                        <td class="actions">
+                            <button class="btn btn-small btn-secondary" onclick="editDevice('{{ device.device_id|replace("'", "\\'") }}', '{{ device.device_name|replace("'", "\\'") }}', '{{ device.device_type }}', {{ 'true' if device.enabled else 'false' }}, '{{ (device.notes or '')|replace("'", "\\'") }}', '{{ device.detection_method or 'both' }}')">
+                                ✏️ Edit
+                            </button>
+                            <button class="btn btn-small btn-primary" onclick="testDevice('{{ device.device_id|replace("'", "\\'") }}', '{{ device.device_name|replace("'", "\\'") }}')">
+                                🧪 Test
+                            </button>
+                            <button class="btn btn-small btn-danger" onclick="deleteDevice('{{ device.device_id|replace("'", "\\'") }}', '{{ device.device_name|replace("'", "\\'") }}')">
+                                🗑️ Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">No devices registered yet. Send a heartbeat with device_id and device_name parameters to register a device.</p>
+            <div class="info-box">
+                <h3>How to register a device:</h3>
+                <p>Send a heartbeat request with these parameters:</p>
+                <code>GET /heartbeat?token=YOUR_SECRET&device_id=unique-id&device_name=My%20iPhone</code>
+                <p>Optional: <code>&device_type=phone</code></p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>ℹ️ About Device Management</h3>
+        <p><strong>Online Status:</strong> A device is considered "online" if it has sent a heartbeat within the last {{ home_threshold }} minutes (your HOME threshold).</p>
+        <p><strong>Presence Detection:</strong> When any enabled online device exists, you're considered HOME and cameras will turn OFF.</p>
+        <p><strong>Disabling Devices:</strong> Disabled devices are ignored for presence detection.</p>
+    </div>
+</div>
+
+<!-- Edit Device Modal -->
+<div id="editModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h2>Edit Device</h2>
+        <form id="editForm" onsubmit="return saveDevice(event);">
+            <input type="hidden" id="edit_device_id">
+
+            <div class="form-group">
+                <label for="edit_device_name">Device Name</label>
+                <input type="text" id="edit_device_name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_device_type">Device Type</label>
+                <select id="edit_device_type">
+                    <option value="phone">Phone</option>
+                    <option value="tablet">Tablet</option>
+                    <option value="laptop">Laptop</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_detection_method">Detection Method</label>
+                <select id="edit_detection_method">
+                    <option value="arp_3x">ARP-3X (Most Robust - Recommended)</option>
+                    <option value="arp">ARP (Fast Layer 2 Detection)</option>
+                    <option value="arp_and_heartbeat">ARP + Heartbeat (Hybrid)</option>
+                    <option value="both">Both (Ping + Heartbeat - Legacy)</option>
+                    <option value="ping">Ping Only (TCP Port Scan)</option>
+                    <option value="heartbeat">Heartbeat Only (Passive)</option>
+                </select>
+                <small style="color: #888; display: block; margin-top: 4px;">
+                    <strong>ARP-3X:</strong> 3 ARP attempts, 2/3 success (most reliable, ~600ms)<br>
+                    <strong>ARP:</strong> Single ARP check (fast, ~200ms, works when phone locked)<br>
+                    <strong>ARP+Heartbeat:</strong> ARP with heartbeat fallback<br>
+                    <strong>Ping:</strong> TCP port scanning (legacy, unreliable with iOS)<br>
+                    <strong>Heartbeat:</strong> Requires iOS Shortcut automation
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_enabled">Enabled</label>
+                <select id="edit_enabled">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_notes">Notes</label>
+                <textarea id="edit_notes" rows="3"></textarea>
+            </div>
+
+            <div class="button-row">
+                <button type="submit" class="btn btn-primary">💾 Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.devices-page {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.devices-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-md);
+}
+
+.devices-table th,
+.devices-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: top;
+}
+
+.devices-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+}
+
+.device-row.disabled {
+    opacity: 0.6;
+}
+
+.device-info {
+    min-width: 200px;
+}
+
+.device-status-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.device-meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.device-meta code {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.connection-info {
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.connection-info div {
+    margin-bottom: 0.25rem;
+}
+
+.status-info {
+    text-align: center;
+    min-width: 100px;
+}
+
+.actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-danger {
+    background: var(--error);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: var(--error-dark);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.pill-blue {
+    background: #3b82f6;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.pill-tiny {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.7rem;
+}
+
+.info-box {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-top: var(--space-md);
+    color: var(--text-primary);
+}
+
+.info-box code {
+    display: block;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    padding: var(--space-sm);
+    border-radius: var(--radius-sm);
+    margin: var(--space-sm) 0;
+    overflow-x: auto;
+    border: 1px solid var(--border-light);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: var(--space-xl);
+    border-radius: var(--radius-lg);
+    max-width: 500px;
+    width: 90%;
+    border: 1px solid var(--border-light);
+}
+
+.button-row {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+</style>
+
+<script>
+function editDevice(deviceId, deviceName, deviceType, enabled, notes, detectionMethod) {
+    document.getElementById('edit_device_id').value = deviceId;
+    document.getElementById('edit_device_name').value = deviceName;
+    document.getElementById('edit_device_type').value = deviceType;
+    document.getElementById('edit_enabled').value = enabled;
+    document.getElementById('edit_notes').value = notes;
+    document.getElementById('edit_detection_method').value = detectionMethod || 'both';
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+function saveDevice(event) {
+    event.preventDefault();
+
+    const deviceId = document.getElementById('edit_device_id').value;
+    const data = {
+        device_name: document.getElementById('edit_device_name').value,
+        device_type: document.getElementById('edit_device_type').value,
+        detection_method: document.getElementById('edit_detection_method').value,
+        enabled: document.getElementById('edit_enabled').value === 'true',
+        notes: document.getElementById('edit_notes').value
+    };
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    fetch(`/api/devices/${deviceId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+
+    return false;
+}
+
+function deleteDevice(deviceId, deviceName) {
+    if (!confirm(`Delete device "${deviceName}"?\n\nThis will remove the device from the system.`)) {
+        return;
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    fetch(`/api/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+}
+
+function testDevice(deviceId, deviceName) {
+    // Show loading message
+    const loadingMsg = `Testing all detection methods for "${deviceName}"...\n\nThis may take 5-10 seconds.`;
+    alert(loadingMsg);
+
+    // Call test endpoint
+    fetch(`/api/devices/${deviceId}/test`)
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) {
+            alert('Error: ' + result.error);
+            return;
+        }
+
+        // Format results
+        let msg = `📊 Detection Test Results for "${result.device_name}"\n`;
+        msg += `IP Address: ${result.ip_address}\n`;
+        msg += `Current Method: ${result.detection_method}\n\n`;
+
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `TEST RESULTS:\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        // ARP-3X
+        const arp3x = result.tests.arp_3x;
+        msg += `🔬 ARP-3X (3 attempts, 2/3 threshold)\n`;
+        msg += `   Result: ${arp3x.result ? '✅ ONLINE' : '❌ OFFLINE'}\n`;
+        msg += `   Duration: ${arp3x.duration_ms}ms\n`;
+        msg += `   Method: ${arp3x.method}\n\n`;
+
+        // ARP
+        const arp = result.tests.arp;
+        msg += `🔍 ARP (Single attempt)\n`;
+        msg += `   Result: ${arp.result ? '✅ ONLINE' : '❌ OFFLINE'}\n`;
+        msg += `   Duration: ${arp.duration_ms}ms\n`;
+        msg += `   Method: ${arp.method}\n\n`;
+
+        // Ping
+        const ping = result.tests.ping;
+        msg += `📡 PING (TCP Port Scanning)\n`;
+        msg += `   Result: ${ping.result ? '✅ ONLINE' : '❌ OFFLINE'}\n`;
+        msg += `   Duration: ${ping.duration_ms}ms\n`;
+        msg += `   Method: ${ping.method}\n\n`;
+
+        // Heartbeat
+        const hb = result.tests.heartbeat;
+        msg += `💓 HEARTBEAT (iOS Shortcut)\n`;
+        if (hb.error) {
+            msg += `   Result: ⚠️ ${hb.error}\n`;
+        } else {
+            msg += `   Result: ${hb.result ? '✅ ONLINE' : '❌ OFFLINE'}\n`;
+            msg += `   Last Seen: ${hb.minutes_ago.toFixed(1)} min ago\n`;
+            msg += `   Threshold: ${hb.threshold_minutes} min\n`;
+        }
+
+        msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `RECOMMENDATION:\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        msg += `✨ Suggested Method: ${result.recommendation.suggested_method}\n`;
+        msg += `📝 Reason: ${result.recommendation.reason}\n\n`;
+
+        msg += `Would you like to update this device to use "${result.recommendation.suggested_method}"?`;
+
+        if (confirm(msg)) {
+            // User wants to update detection method
+            const data = {
+                device_name: result.device_name,
+                detection_method: result.recommendation.suggested_method
+            };
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            fetch(`/api/devices/${deviceId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(updateResult => {
+                if (updateResult.success) {
+                    alert(`✅ Updated "${result.device_name}" to use "${result.recommendation.suggested_method}"`);
+                    location.reload();
+                } else {
+                    alert('Error updating device: ' + (updateResult.error || 'Unknown error'));
+                }
+            })
+            .catch(err => alert('Network error: ' + err.message));
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+}
+
+// Auto-refresh device status every 10 seconds
+function refreshDeviceStatus() {
+    fetch('/api/devices')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.devices) return;
+
+            // Update each device row
+            data.devices.forEach(device => {
+                const row = document.querySelector(`tr[data-device-id="${device.device_id}"]`);
+                if (!row) return;
+
+                // Update online/offline status
+                const statusCell = row.querySelector('td:first-child');
+                if (statusCell) {
+                    statusCell.innerHTML = device.is_online
+                        ? '<span class="pill pill-green">Online</span>'
+                        : '<span class="pill pill-gray">Offline</span>';
+                }
+
+                // Update last seen (5th column)
+                const cells = row.querySelectorAll('td');
+                if (cells[4]) {
+                    cells[4].textContent = device.last_seen ? device.last_seen.substring(0, 19) : 'Never';
+                }
+            });
+        })
+        .catch(err => console.error('Auto-refresh error:', err));
+}
+
+// Start auto-refresh on page load
+if (document.querySelector('.devices-table')) {
+    setInterval(refreshDeviceStatus, 10000); // Every 10 seconds
+}
+</script>
+{% endblock %}

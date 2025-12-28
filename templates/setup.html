@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Setup - WyzeGuardi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .setup-container {
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .setup-card {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: var(--space-xl);
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: var(--space-xl);
+        }
+        .setup-header h1 {
+            font-size: 2rem;
+            color: var(--color-primary);
+            margin-bottom: var(--space-sm);
+        }
+        .setup-section {
+            margin-bottom: var(--space-xl);
+            padding-bottom: var(--space-lg);
+            border-bottom: 1px solid var(--border-light);
+        }
+        .setup-section:last-of-type {
+            border-bottom: none;
+        }
+        .setup-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: var(--space-md);
+            color: var(--color-text);
+        }
+        .form-group {
+            margin-bottom: var(--space-md);
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: var(--space-xs);
+            color: var(--color-text);
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: var(--space-sm) var(--space-md);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+        .password-wrapper {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        .btn-row {
+            display: flex;
+            gap: var(--space-md);
+            margin-top: var(--space-lg);
+        }
+        .btn-full {
+            flex: 1;
+        }
+        .test-result {
+            margin-top: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+        }
+        .test-result.success {
+            background: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid var(--success);
+        }
+        .test-result.error {
+            background: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--error);
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-card">
+            <div class="setup-header">
+                <h1>🏠 WyzeGuardi Setup</h1>
+                <p>Configure your system in 3 steps</p>
+            </div>
+
+            <form action="{{ url_for('setup_save') }}" method="POST" id="setupForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <!-- Step 1: Wyze Credentials -->
+                <div class="setup-section">
+                    <h2>Step 1: Wyze Credentials</h2>
+                    <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: var(--space-md);">
+                        Get your API credentials from <a href="https://developer-api-console.wyze.com/" target="_blank">developer-api-console.wyze.com</a>
+                    </p>
+
+                    <div class="form-group">
+                        <label for="wyze_email">Email *</label>
+                        <input type="email" id="wyze_email" name="wyze_email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wyze_password">Password *</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="wyze_password" name="wyze_password" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('wyze_password')">👁</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wyze_api_key">API Key *</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="wyze_api_key" name="wyze_api_key" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('wyze_api_key')">👁</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wyze_api_id">API ID *</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="wyze_api_id" name="wyze_api_id" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('wyze_api_id')">👁</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wyze_totp_key">TOTP Key (Required if 2FA is enabled) ⚠️</label>
+                        <input type="text" id="wyze_totp_key" name="wyze_totp_key" placeholder="Your authenticator app secret key">
+                        <p style="font-size: 0.875rem; color: var(--warning); font-weight: 600;">
+                            ⚠️ IMPORTANT: If your Wyze account has Two-Factor Authentication enabled, you MUST provide your TOTP key or authentication will fail with 400 Bad Request.
+                        </p>
+                        <p style="font-size: 0.875rem; color: var(--text-muted);">
+                            <strong>How to get your TOTP key:</strong> In the Wyze app, go to Account → Security → Two-Factor Authentication → Disable and re-enable 2FA → Click "Can't scan?" to see the secret key.
+                        </p>
+                    </div>
+
+                    <button type="button" class="btn btn-secondary" onclick="testWyzeConnection()">
+                        🔌 Test Connection
+                    </button>
+                    <div id="test-result"></div>
+                </div>
+
+                <!-- Step 2: Security -->
+                <div class="setup-section">
+                    <h2>Step 2: Security</h2>
+
+                    <div class="form-group">
+                        <label for="webhook_secret">Webhook Secret *</label>
+                        <input type="text" id="webhook_secret" name="webhook_secret" required value="{{ random_secret }}">
+                    </div>
+
+                    <button type="button" class="btn btn-secondary" onclick="generateSecret()">
+                        🔄 Generate New Secret
+                    </button>
+                </div>
+
+                <!-- Step 3: Settings -->
+                <div class="setup-section">
+                    <h2>Step 3: Settings</h2>
+
+                    <div class="form-group">
+                        <label for="timezone">Timezone *</label>
+                        <select id="timezone" name="timezone" required>
+                            <option value="America/New_York">America/New_York (EST/EDT)</option>
+                            <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                            <option value="America/Denver">America/Denver (MST/MDT)</option>
+                            <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                            <option value="America/Phoenix">America/Phoenix (MST - no DST)</option>
+                            <option value="America/Anchorage">America/Anchorage (AKST/AKDT)</option>
+                            <option value="Pacific/Honolulu">Pacific/Honolulu (HST)</option>
+                            <option value="Europe/London">Europe/London (GMT/BST)</option>
+                            <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                            <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="home_threshold">Home Threshold (minutes) *</label>
+                        <input type="number" id="home_threshold" name="home_threshold" value="10" min="1" required>
+                        <p style="font-size: 0.875rem; color: var(--text-muted);">Cameras turn OFF if heartbeat within this time</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="away_threshold">Away Threshold (minutes) *</label>
+                        <input type="number" id="away_threshold" name="away_threshold" value="30" min="1" required>
+                        <p style="font-size: 0.875rem; color: var(--text-muted);">Cameras turn ON if no heartbeat for this time</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="manual_override_duration">Manual Override Duration (hours) *</label>
+                        <input type="number" id="manual_override_duration" name="manual_override_duration" value="2" min="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="log_level">Log Level *</label>
+                        <select id="log_level" name="log_level" required>
+                            <option value="INFO" selected>INFO</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">
+                    ✅ Complete Setup
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Generate initial random secret on page load
+        window.onload = function() {
+            if (!document.getElementById('webhook_secret').value) {
+                generateSecret();
+            }
+        };
+
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+
+        function generateSecret() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            fetch('/api/generate-secret', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('webhook_secret').value = data.secret;
+                })
+                .catch(err => console.error('Failed to generate secret:', err));
+        }
+
+        function testWyzeConnection() {
+            const email = document.getElementById('wyze_email').value;
+            const password = document.getElementById('wyze_password').value;
+            const api_key = document.getElementById('wyze_api_key').value;
+            const api_id = document.getElementById('wyze_api_id').value;
+            const totp_key = document.getElementById('wyze_totp_key').value;
+
+            if (!email || !password || !api_key || !api_id) {
+                showTestResult('Please fill in all Wyze credentials first', false);
+                return;
+            }
+
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<div class="test-result">Testing connection...</div>';
+
+            const requestBody = { email, password, api_key, api_id };
+            if (totp_key) {
+                requestBody.totp_key = totp_key;
+            }
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            fetch('/api/test-wyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(r => r.json())
+            .then(data => {
+                showTestResult(data.message, data.success);
+            })
+            .catch(err => {
+                showTestResult('Network error: ' + err.message, false);
+            });
+        }
+
+        function showTestResult(message, success) {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = `<div class="test-result ${success ? 'success' : 'error'}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

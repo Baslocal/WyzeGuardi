@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Settings - WyzeGuardi{% endblock %}
+
+{% block content %}
+<div class="settings-edit">
+    <h1>Edit System Settings</h1>
+    <p>Update your WyzeGuardi configuration. Changes will take effect after saving.</p>
+
+    <form action="{{ url_for('settings_save') }}" method="POST" id="settingsForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Wyze Credentials -->
+        <div class="card">
+            <h2>Wyze Credentials</h2>
+
+            <div class="form-group">
+                <label for="wyze_email">Email *</label>
+                <input type="email" id="wyze_email" name="wyze_email" value="{{ current.wyze_email }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="wyze_password">Password *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="wyze_password" name="wyze_password" value="{{ current.wyze_password }}" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('wyze_password')">👁</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="wyze_api_key">API Key *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="wyze_api_key" name="wyze_api_key" value="{{ current.wyze_api_key }}" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('wyze_api_key')">👁</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="wyze_api_id">API ID *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="wyze_api_id" name="wyze_api_id" value="{{ current.wyze_api_id }}" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('wyze_api_id')">👁</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="wyze_totp_key">TOTP Key (Leave empty if 2FA disabled)</label>
+                <input type="text" id="wyze_totp_key" name="wyze_totp_key" value="{{ current.wyze_totp_key }}" placeholder="Only needed if 2FA is enabled">
+                <p class="help-text">Only required if you have Two-Factor Authentication enabled on your Wyze account.</p>
+            </div>
+
+            <button type="button" class="btn btn-secondary" onclick="testWyzeConnection()">
+                🔌 Test Wyze Connection
+            </button>
+            <div id="test-result"></div>
+        </div>
+
+        <!-- Security -->
+        <div class="card">
+            <h2>Security</h2>
+
+            <div class="form-group">
+                <label for="webhook_secret">Webhook Secret *</label>
+                <input type="text" id="webhook_secret" name="webhook_secret" value="{{ current.webhook_secret }}" required>
+                <p class="help-text">Used to authenticate heartbeat requests from your phone.</p>
+            </div>
+
+            <button type="button" class="btn btn-secondary" onclick="generateSecret()">
+                🔄 Generate New Secret
+            </button>
+        </div>
+
+        <!-- Schedule Settings -->
+        <div class="card">
+            <h2>Camera Schedule</h2>
+            <p>Configure when cameras should be ON (monitoring) vs OFF (home).</p>
+
+            <h3>Weekday Schedule</h3>
+            <div class="form-group">
+                <label for="weekday_home_start">Weekday Home Start (hour) *</label>
+                <input type="number" id="weekday_home_start" name="weekday_home_start" value="{{ current.weekday_home_start }}" min="0" max="23" required>
+                <p class="help-text">Hour when you're typically home on weekdays (cameras turn OFF). 0-23 format.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="weekday_home_end">Weekday Home End (hour) *</label>
+                <input type="number" id="weekday_home_end" name="weekday_home_end" value="{{ current.weekday_home_end }}" min="0" max="23" required>
+                <p class="help-text">Hour when you typically leave on weekdays (cameras turn ON). 0-23 format.</p>
+            </div>
+
+            <h3>Weekend Schedule</h3>
+            <div class="form-group">
+                <label for="weekend_home_start">Weekend Home Start (hour) *</label>
+                <input type="number" id="weekend_home_start" name="weekend_home_start" value="{{ current.weekend_home_start }}" min="0" max="23" required>
+                <p class="help-text">Hour when you're typically home on weekends (cameras turn OFF). 0-23 format.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="weekend_home_end">Weekend Home End (hour) *</label>
+                <input type="number" id="weekend_home_end" name="weekend_home_end" value="{{ current.weekend_home_end }}" min="0" max="23" required>
+                <p class="help-text">Hour when weekend ends (cameras turn ON). 0-23 format.</p>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="card">
+            <h2>System Settings</h2>
+
+            <div class="form-group">
+                <label for="timezone">Timezone *</label>
+                <select id="timezone" name="timezone" required>
+                    <option value="America/New_York" {% if current.timezone == 'America/New_York' %}selected{% endif %}>America/New_York (EST/EDT)</option>
+                    <option value="America/Chicago" {% if current.timezone == 'America/Chicago' %}selected{% endif %}>America/Chicago (CST/CDT)</option>
+                    <option value="America/Denver" {% if current.timezone == 'America/Denver' %}selected{% endif %}>America/Denver (MST/MDT)</option>
+                    <option value="America/Los_Angeles" {% if current.timezone == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles (PST/PDT)</option>
+                    <option value="America/Phoenix" {% if current.timezone == 'America/Phoenix' %}selected{% endif %}>America/Phoenix (MST - no DST)</option>
+                    <option value="America/Anchorage" {% if current.timezone == 'America/Anchorage' %}selected{% endif %}>America/Anchorage (AKST/AKDT)</option>
+                    <option value="Pacific/Honolulu" {% if current.timezone == 'Pacific/Honolulu' %}selected{% endif %}>Pacific/Honolulu (HST)</option>
+                    <option value="Europe/London" {% if current.timezone == 'Europe/London' %}selected{% endif %}>Europe/London (GMT/BST)</option>
+                    <option value="Europe/Paris" {% if current.timezone == 'Europe/Paris' %}selected{% endif %}>Europe/Paris (CET/CEST)</option>
+                    <option value="Asia/Tokyo" {% if current.timezone == 'Asia/Tokyo' %}selected{% endif %}>Asia/Tokyo (JST)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="home_threshold">Home Threshold (minutes) *</label>
+                <input type="number" id="home_threshold" name="home_threshold" value="{{ current.home_threshold }}" min="1" required>
+                <p class="help-text">Cameras turn OFF if heartbeat received within this time.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="away_threshold">Away Threshold (minutes) *</label>
+                <input type="number" id="away_threshold" name="away_threshold" value="{{ current.away_threshold }}" min="1" required>
+                <p class="help-text">Cameras turn ON if no heartbeat for this time.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="manual_override_duration">Manual Override Duration (hours) *</label>
+                <input type="number" id="manual_override_duration" name="manual_override_duration" value="{{ current.manual_override_duration }}" min="1" required>
+                <p class="help-text">How long manual ON/OFF commands stay active.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="state_machine_interval">State Machine Interval (minutes) *</label>
+                <input type="number" id="state_machine_interval" name="state_machine_interval" value="{{ current.state_machine_interval }}" min="1" max="60" required>
+                <p class="help-text">How often the server checks device presence and pings devices. Lower = more responsive, higher = less network traffic.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="log_level">Log Level *</label>
+                <select id="log_level" name="log_level" required>
+                    <option value="DEBUG" {% if current.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                    <option value="INFO" {% if current.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                    <option value="WARNING" {% if current.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                    <option value="ERROR" {% if current.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button type="submit" class="btn btn-primary">💾 Save All Settings</button>
+            <a href="{{ url_for('settings') }}" class="btn btn-secondary">❌ Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.settings-edit {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.form-group {
+    margin-bottom: var(--space-md);
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.help-text {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+.password-wrapper {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.button-row {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
+}
+
+.test-result {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+}
+
+.test-result.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success);
+}
+
+.test-result.error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error);
+}
+</style>
+
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+function generateSecret() {
+    fetch('/api/generate-secret', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('webhook_secret').value = data.secret;
+        })
+        .catch(err => console.error('Failed to generate secret:', err));
+}
+
+function testWyzeConnection() {
+    const email = document.getElementById('wyze_email').value;
+    const password = document.getElementById('wyze_password').value;
+    const api_key = document.getElementById('wyze_api_key').value;
+    const api_id = document.getElementById('wyze_api_id').value;
+    const totp_key = document.getElementById('wyze_totp_key').value;
+
+    if (!email || !password || !api_key || !api_id) {
+        showTestResult('Please fill in all required Wyze credentials first', false);
+        return;
+    }
+
+    const resultDiv = document.getElementById('test-result');
+    resultDiv.innerHTML = '<div class="test-result">Testing connection...</div>';
+
+    const requestBody = { email, password, api_key, api_id };
+    if (totp_key) {
+        requestBody.totp_key = totp_key;
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    fetch('/api/test-wyze', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(requestBody)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showTestResult(data.message, data.success);
+    })
+    .catch(err => {
+        showTestResult('Network error: ' + err.message, false);
+    });
+}
+
+function showTestResult(message, success) {
+    const resultDiv = document.getElementById('test-result');
+    resultDiv.innerHTML = `<div class="test-result ${success ? 'success' : 'error'}">${message}</div>`;
+}
+</script>
+{% endblock %}

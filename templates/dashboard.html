@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - WyzeGuardi{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- System Status Badge -->
+    <div class="status-badge status-{{ system_status }}">
+        {% if system_status == 'operational' %}
+            ✓ All Systems Operational
+        {% else %}
+            ⚠ System Degraded
+        {% endif %}
+    </div>
+
+    <!-- Manual Override Banner -->
+    {% if state.manual_override_until %}
+        <div class="override-banner active">
+            <div class="override-icon">⏱️</div>
+            <div class="override-content">
+                <div class="override-text">Manual Override Active: {{ state.cameras|upper }}</div>
+                <div class="override-time">Until {{ state.manual_override_until[:16] }}</div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Enhanced Control Panel -->
+    <div class="card">
+        <h2>Manual Control</h2>
+        <div class="control-panel">
+            <a href="{{ url_for('manual_off') }}" class="control-btn off" onclick="return confirm('Turn ALL cameras OFF for 2 hours?\n\nPrivacy mode will be enabled.');">
+                <div class="control-icon">📹</div>
+                <div class="control-text">Turn Cameras OFF</div>
+                <div class="control-subtext">Privacy Mode • 2 Hours</div>
+            </a>
+            <a href="{{ url_for('manual_on') }}" class="control-btn on" onclick="return confirm('Turn ALL cameras ON for 2 hours?\n\nSecurity mode will be enabled.');">
+                <div class="control-icon">👁️</div>
+                <div class="control-text">Turn Cameras ON</div>
+                <div class="control-subtext">Security Mode • 2 Hours</div>
+            </a>
+            <a href="{{ url_for('manual_auto') }}" class="control-btn auto" onclick="return confirm('Return to automatic control?\n\nManual override will be cleared.');">
+                <div class="control-icon">🤖</div>
+                <div class="control-text">Return to AUTO</div>
+                <div class="control-subtext">Resume Automation</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Enhanced Status Cards -->
+    <div class="status-cards-grid">
+        <!-- Presence Status Card -->
+        <div class="status-card {% if state.presence_status == 'HOME' %}active{% elif state.presence_status == 'AWAY_CONFIRMED' %}away{% elif state.presence_status == 'GRACE' %}grace{% endif %}" data-type="presence">
+            <div class="status-icon">
+                {% if state.presence_status == 'HOME' %}🏠
+                {% elif state.presence_status == 'GRACE' %}⏳
+                {% elif state.presence_status == 'AWAY_CONFIRMED' %}🚗
+                {% else %}❓{% endif %}
+            </div>
+            <div class="status-label">PRESENCE STATUS</div>
+            <div class="status-value">{{ state.presence_status or 'UNKNOWN' }}</div>
+            {% if state.presence_status == 'GRACE' %}
+                <div class="status-detail">Grace period active</div>
+            {% endif %}
+        </div>
+
+        <!-- Camera State Card -->
+        <div class="status-card {% if state.cameras == 'off' %}active{% elif state.cameras == 'on' %}away{% endif %}" data-type="cameras">
+            <div class="status-icon">📹</div>
+            <div class="status-label">CAMERA STATE</div>
+            <div class="status-value">{{ state.cameras|upper }}</div>
+            <div class="status-detail">
+                {% if state.cameras == 'off' %}Privacy Mode
+                {% elif state.cameras == 'on' %}Security Mode
+                {% else %}Unknown{% endif %}
+            </div>
+        </div>
+
+        <!-- Mode Card -->
+        <div class="status-card" data-type="mode">
+            <div class="status-icon">
+                {% if state.mode == 'presence' %}🤖
+                {% elif state.mode == 'manual' %}⚙️
+                {% elif state.mode == 'schedule' %}📅
+                {% else %}❓{% endif %}
+            </div>
+            <div class="status-label">MODE</div>
+            <div class="status-value">{{ state.mode|title }}</div>
+            <div class="status-detail">
+                {% if state.mode == 'presence' %}Automatic
+                {% elif state.mode == 'manual' %}Manual Override
+                {% elif state.mode == 'schedule' %}Time-Based
+                {% else %}Unknown{% endif %}
+            </div>
+        </div>
+
+        <!-- Last Heartbeat Card -->
+        <div class="status-card" data-type="heartbeat">
+            <div class="status-icon">💓</div>
+            <div class="status-label">LAST HEARTBEAT</div>
+            <div class="status-value">
+                {{ heartbeat_time_ago or 'Never' }}
+            </div>
+        </div>
+    </div>
+
+    <!-- System Health Card -->
+    <div class="card">
+        <h2>System Health</h2>
+        <div class="health-grid">
+            <div class="health-item">
+                <div class="health-icon">🔌</div>
+                <span class="label">Wyze API:</span>
+                <span class="pill pill-{{ 'green' if api_stats.uptime_percent > 95 else ('yellow' if api_stats.uptime_percent > 70 else 'red') }}">
+                    {{ '%.1f'|format(api_stats.uptime_percent or 0) }}% uptime
+                </span>
+            </div>
+            <div class="health-item">
+                <div class="health-icon">💾</div>
+                <span class="label">Database:</span>
+                <span class="pill pill-{{ 'green' if db_health.connected else 'red' }}">
+                    {{ 'Connected' if db_health.connected else 'Disconnected' }}
+                </span>
+            </div>
+            <div class="health-item">
+                <div class="health-icon">⚙️</div>
+                <span class="label">State Machine:</span>
+                <span class="pill pill-green">Running</span>
+            </div>
+        </div>
+        {% if state.reason %}
+            <div class="state-reason">
+                <strong>Current Reason:</strong> {{ state.reason }}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Camera List -->
+    <div class="card">
+        <h2>Cameras ({{ cameras|length }})</h2>
+        {% if cameras %}
+            <table class="camera-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Model</th>
+                        <th>MAC Address</th>
+                        <th>Current State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in cameras %}
+                    <tr>
+                        <td>{{ camera.nickname }}</td>
+                        <td>{{ camera.product_model }}</td>
+                        <td><code>{{ camera.mac }}</code></td>
+                        <td>
+                            <span class="camera-state camera-{{ state.cameras }}">
+                                {{ state.cameras|upper }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">No cameras found. Check Wyze API configuration.</p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+        <h2>Recent Activity</h2>
+        {% if recent_logs %}
+            <div class="activity-log">
+                {% for log in recent_logs %}
+                <div class="log-entry log-{{ log.level }}">
+                    <span class="log-time">{{ log.timestamp[:19] }}</span>
+                    <span class="log-type">{{ log.type }}</span>
+                    <span class="log-level">{{ log.level|upper }}</span>
+                    <span class="log-message">{{ log.message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('logs') }}" class="btn btn-secondary">View All Logs</a>
+        {% else %}
+            <p class="no-data">No recent activity.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 30 seconds
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

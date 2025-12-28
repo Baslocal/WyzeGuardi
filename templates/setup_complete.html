@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Setup Complete - WyzeGuardi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .setup-container {
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .setup-card {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: var(--space-xl);
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: var(--space-xl);
+        }
+        .setup-header h1 {
+            font-size: 2rem;
+            color: var(--color-success);
+            margin-bottom: var(--space-sm);
+        }
+        .key-section {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            margin: var(--space-xl) 0;
+        }
+        .key-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+        .key-display {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            font-size: 0.875rem;
+            margin: var(--space-md) 0;
+        }
+        .warning-box {
+            background: var(--warning-bg);
+            border-left: 4px solid var(--warning);
+            padding: var(--space-md);
+            margin: var(--space-md) 0;
+            border-radius: var(--radius-sm);
+        }
+        .warning-box strong {
+            display: block;
+            margin-bottom: var(--space-xs);
+            color: var(--warning-text);
+        }
+        .warning-box p {
+            margin: 0;
+            color: var(--warning-text);
+            font-size: 0.875rem;
+        }
+        .info-box {
+            background: var(--blue-bg);
+            border-left: 4px solid var(--blue-primary);
+            padding: var(--space-md);
+            margin: var(--space-md) 0;
+            border-radius: var(--radius-sm);
+        }
+        .info-box p {
+            margin: 0;
+            color: var(--blue-text);
+            font-size: 0.875rem;
+        }
+        .btn-full {
+            width: 100%;
+            margin-top: var(--space-lg);
+        }
+        .copy-btn {
+            margin-top: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-secondary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .copy-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-card">
+            <div class="setup-header">
+                <h1>✅ Setup Complete!</h1>
+                <p>Your WyzeGuardi system is now configured</p>
+            </div>
+
+            <div class="key-section">
+                <h2>🔐 Database Encryption Key</h2>
+
+                <div class="warning-box">
+                    <strong>⚠️ IMPORTANT - Save This Key!</strong>
+                    <p>This key encrypts your Wyze credentials in the database. You'll need it if you migrate your database to another system.</p>
+                </div>
+
+                <div class="key-display" id="encryption-key">{{ encryption_key }}</div>
+
+                <button type="button" class="copy-btn" onclick="copyKey()">📋 Copy to Clipboard</button>
+
+                <div class="info-box" style="margin-top: var(--space-md);">
+                    <p><strong>Key Location:</strong> The encryption key is stored in <code>.db_key</code> in your installation directory.</p>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>To change the key:</strong> Delete <code>.db_key</code> and restart the application. A new key will be generated automatically. (Note: You'll need to re-enter your Wyze credentials)</p>
+                </div>
+            </div>
+
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-full">
+                🏠 Go to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function copyKey() {
+            const keyText = document.getElementById('encryption-key').textContent;
+            navigator.clipboard.writeText(keyText).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy key. Please select and copy manually.');
+            });
+        }
+    </script>
+</body>
+</html>

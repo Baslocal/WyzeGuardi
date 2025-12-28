@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule Management - WyzeGuardi{% endblock %}
+
+{% block content %}
+{# Define macro for formatting days at the top for clarity #}
+{% set day_map = {'0': 'Mon', '1': 'Tue', '2': 'Wed', '3': 'Thu', '4': 'Fri', '5': 'Sat', '6': 'Sun'} %}
+{% macro format_days(days_of_week) %}
+    {%- set days = days_of_week.split(',') -%}
+    {%- for day in days -%}
+        {{ day_map.get(day.strip(), day.strip()) }}{{ ', ' if not loop.last else '' }}
+    {%- endfor -%}
+{% endmacro %}
+
+<div class="schedules-page">
+    <h1>Schedule Management</h1>
+    <p>Create custom schedules for when cameras should be ON or OFF based on day and time.</p>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Custom Schedules ({{ schedules|length }})</h2>
+            <button class="btn btn-primary" onclick="showCreateModal()">
+                ➕ Create New Schedule
+            </button>
+        </div>
+
+        {% if schedules %}
+            <table class="schedules-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Name</th>
+                        <th>Days</th>
+                        <th>Time Window</th>
+                        <th>Cameras Action</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in schedules %}
+                    <tr class="schedule-row {{ 'disabled' if not schedule.enabled else '' }}">
+                        <td>
+                            <span class="pill pill-{{ 'green' if schedule.enabled else 'gray' }}">
+                                {{ 'Enabled' if schedule.enabled else 'Disabled' }}
+                            </span>
+                        </td>
+                        <td><strong>{{ schedule.name }}</strong></td>
+                        <td>{{ format_days(schedule.days_of_week) }}</td>
+                        <td><code>{{ schedule.start_time }} - {{ schedule.end_time }}</code></td>
+                        <td>
+                            <span class="pill pill-{{ 'red' if schedule.cameras_state == 'on' else 'green' }}">
+                                Cameras {{ schedule.cameras_state.upper() }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-small btn-secondary" onclick='editSchedule({{ schedule.id }}, {{ schedule|tojson }})'>
+                                ✏️ Edit
+                            </button>
+                            <button class="btn btn-small btn-danger" onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.name }}')">
+                                🗑️ Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">No custom schedules yet. Create one to define when cameras should be ON or OFF.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>ℹ️ How Schedules Work</h3>
+        <p><strong>Priority:</strong> Custom schedules are checked first. If no matching schedule is found, the system falls back to the default weekday/weekend schedule.</p>
+        <p><strong>Days:</strong> 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Saturday, 6=Sunday</p>
+        <p><strong>Time Window:</strong> During the specified time window, cameras will be set to the chosen state (ON or OFF).</p>
+        <p><strong>Enabled:</strong> Only enabled schedules are active. Disabled schedules are kept but not used.</p>
+    </div>
+</div>
+
+<!-- Create/Edit Schedule Modal -->
+<div id="scheduleModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <h2 id="modalTitle">Create Schedule</h2>
+        <form id="scheduleForm" onsubmit="return saveSchedule(event);">
+            <input type="hidden" id="schedule_id">
+
+            <div class="form-group">
+                <label for="schedule_name">Schedule Name *</label>
+                <input type="text" id="schedule_name" placeholder="e.g., Weekend Morning" required>
+            </div>
+
+            <div class="form-group">
+                <label>Days of Week *</label>
+                <div class="day-checkboxes">
+                    <label><input type="checkbox" class="day-checkbox" value="0"> Mon</label>
+                    <label><input type="checkbox" class="day-checkbox" value="1"> Tue</label>
+                    <label><input type="checkbox" class="day-checkbox" value="2"> Wed</label>
+                    <label><input type="checkbox" class="day-checkbox" value="3"> Thu</label>
+                    <label><input type="checkbox" class="day-checkbox" value="4"> Fri</label>
+                    <label><input type="checkbox" class="day-checkbox" value="5"> Sat</label>
+                    <label><input type="checkbox" class="day-checkbox" value="6"> Sun</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="start_time">Start Time *</label>
+                <input type="time" id="start_time" required>
+                <p class="help-text">When this schedule period begins</p>
+            </div>
+
+            <div class="form-group">
+                <label for="end_time">End Time *</label>
+                <input type="time" id="end_time" required>
+                <p class="help-text">When this schedule period ends</p>
+            </div>
+
+            <div class="form-group">
+                <label for="cameras_state">Cameras Action *</label>
+                <select id="cameras_state" required>
+                    <option value="off">Cameras OFF (home/safe)</option>
+                    <option value="on">Cameras ON (away/monitoring)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="schedule_enabled">Enabled</label>
+                <select id="schedule_enabled">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+
+            <div class="button-row">
+                <button type="submit" class="btn btn-primary">💾 Save Schedule</button>
+                <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.schedules-page {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.schedules-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-md);
+}
+
+.schedules-table th,
+.schedules-table td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.schedules-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+}
+
+.schedule-row.disabled {
+    opacity: 0.6;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-danger {
+    background: var(--error);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: var(--error-dark);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.day-checkboxes {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.day-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: var(--space-xl);
+    border-radius: var(--radius-lg);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-light);
+}
+
+.button-row {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.help-text {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+</style>
+
+<script>
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'Create Schedule';
+    document.getElementById('scheduleForm').reset();
+    document.getElementById('schedule_id').value = '';
+    document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+function editSchedule(scheduleId, schedule) {
+    document.getElementById('modalTitle').textContent = 'Edit Schedule';
+    document.getElementById('schedule_id').value = scheduleId;
+    document.getElementById('schedule_name').value = schedule.name;
+    document.getElementById('start_time').value = schedule.start_time;
+    document.getElementById('end_time').value = schedule.end_time;
+    document.getElementById('cameras_state').value = schedule.cameras_state;
+    document.getElementById('schedule_enabled').value = schedule.enabled ? 'true' : 'false';
+
+    // Set day checkboxes
+    document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = false);
+    const days = schedule.days_of_week.split(',').map(d => d.trim());
+    days.forEach(day => {
+        const checkbox = document.querySelector(`.day-checkbox[value="${day}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+function closeScheduleModal() {
+    document.getElementById('scheduleModal').style.display = 'none';
+}
+
+function saveSchedule(event) {
+    event.preventDefault();
+
+    const scheduleId = document.getElementById('schedule_id').value;
+    const isEdit = scheduleId !== '';
+
+    // Get selected days
+    const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked'))
+        .map(cb => cb.value)
+        .join(',');
+
+    if (!selectedDays) {
+        alert('Please select at least one day of the week');
+        return false;
+    }
+
+    const data = {
+        name: document.getElementById('schedule_name').value,
+        days_of_week: selectedDays,
+        start_time: document.getElementById('start_time').value,
+        end_time: document.getElementById('end_time').value,
+        cameras_state: document.getElementById('cameras_state').value,
+        enabled: document.getElementById('schedule_enabled').value === 'true'
+    };
+
+    const url = isEdit ? `/api/schedules/${scheduleId}` : '/api/schedules';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success || result.schedule_id) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+
+    return false;
+}
+
+function deleteSchedule(scheduleId, scheduleName) {
+    if (!confirm(`Delete schedule "${scheduleName}"?`)) {
+        return;
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    fetch(`/api/schedules/${scheduleId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+}
+</script>
+{% endblock %}

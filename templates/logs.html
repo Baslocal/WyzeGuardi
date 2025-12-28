@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Logs - WyzeGuardi{% endblock %}
+
+{% block content %}
+<div class="logs">
+    <h1>Activity Logs</h1>
+
+    <!-- Filters -->
+    <div class="card">
+        <h2>Filters</h2>
+        <form method="get" class="filters-form">
+            <div class="filter-group">
+                <label for="type">Type:</label>
+                <select name="type" id="type">
+                    <option value="">All Types</option>
+                    <option value="PRESENCE" {% if current_type == 'PRESENCE' %}selected{% endif %}>Presence</option>
+                    <option value="CAMERA" {% if current_type == 'CAMERA' %}selected{% endif %}>Camera</option>
+                    <option value="API" {% if current_type == 'API' %}selected{% endif %}>API</option>
+                    <option value="SYSTEM" {% if current_type == 'SYSTEM' %}selected{% endif %}>System</option>
+                    <option value="MAINTENANCE" {% if current_type == 'MAINTENANCE' %}selected{% endif %}>Maintenance</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="level">Level:</label>
+                <select name="level" id="level">
+                    <option value="">All Levels</option>
+                    <option value="info" {% if current_level == 'info' %}selected{% endif %}>Info</option>
+                    <option value="warn" {% if current_level == 'warn' %}selected{% endif %}>Warning</option>
+                    <option value="error" {% if current_level == 'error' %}selected{% endif %}>Error</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="limit">Limit:</label>
+                <select name="limit" id="limit">
+                    <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+                    <option value="500" {% if limit == 500 %}selected{% endif %}>500</option>
+                    <option value="1000" {% if limit == 1000 %}selected{% endif %}>1000</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <a href="{{ url_for('logs') }}" class="btn btn-secondary">Clear Filters</a>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card">
+        <h2>Log Entries ({{ logs|length }})</h2>
+        {% if logs %}
+            <div class="logs-table-wrapper">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>Level</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr class="log-row log-{{ log.level }}">
+                            <td class="log-timestamp">{{ log.timestamp[:19] }}</td>
+                            <td class="log-type">
+                                <span class="badge badge-{{ log.type|lower }}">{{ log.type }}</span>
+                            </td>
+                            <td class="log-level">
+                                <span class="badge badge-{{ log.level }}">{{ log.level|upper }}</span>
+                            </td>
+                            <td class="log-message">
+                                {{ log.message }}
+                                {% if log.details %}
+                                <details class="log-details">
+                                    <summary>Details</summary>
+                                    <pre>{{ log.details }}</pre>
+                                </details>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination (future) -->
+            <div class="pagination">
+                <p>Showing {{ logs|length }} entries</p>
+            </div>
+        {% else %}
+            <p class="no-data">No logs found matching your filters.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
