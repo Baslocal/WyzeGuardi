@@ -1,346 +1,549 @@
-# WyzeGuardi
+## WyzeGuardi
 
-**Intelligent, presence-based Wyze camera automation system**
+**Intelligent, presence-based Wyze camera automation that actually works.**
 
-WyzeGuardi automatically controls your Wyze cameras based on your phone's presence. Cameras turn OFF when you're home, ON when you're away. Simple, private, and runs locally on your hardware.
+Born from frustration with iOS Shortcuts notifications spam.
+
+## The Problem
+
+Ever tried automating Wyze cameras with iOS Shortcuts? You know the pain:
+- 🔔 **Notification spam** - "Running automation..." every single time
+- ⚠️ **Can't disable alerts** - iOS forces notifications even with "Show When Run" off
+- 📡 **Network blips = false triggers** - WiFi hiccups cause constant misfires
+- 🐛 **Unreliable execution** - sometimes works, sometimes doesn't
+- 📱 **Phone-dependent** - only works when your device is connected
+
+## The Solution
+
+WyzeGuardi moves camera automation **off your phone** and onto a server that runs 24/7:
+
+✅ **Silent operation** - No notifications, ever  
+✅ **Rock-solid detection** - ARP/Layer 2 + grace periods prevent false triggers  
+✅ **Always watching** - Runs independently of your phone  
+✅ **Privacy-first** - All processing stays on your local network  
+✅ **Set and forget** - Just works in the background  
+
+Built by an engineer who got tired of iOS automation nonsense.
+
+---
+
+## Quick Start
+
+Get running in 3 steps:
+
+```bash
+# 1. Clone and install
+git clone https://github.com/Baslocal/WyzeGuardi.git
+cd WyzeGuardi
+sudo bash install.sh
+
+# 2. Start service
+sudo systemctl start wyzeguardi
+
+# 3. Register account (in browser)
+http://YOUR_SERVER_IP:5000/register
+```
+
+Cameras now turn **OFF when you're home**, **ON when you're away**. Automatically.
+
+---
 
 ## Features
 
-### Core Functionality
-- **Automatic Presence Detection**: Multiple detection methods (ARP/Layer 2, network ping, heartbeat)
-- **Manual Override**: Instant control via web dashboard
-- **Custom Schedules**: Time-based camera control with custom rules
-- **Multiple Devices**: Track multiple phones, tablets, etc.
-- **Privacy-First**: Runs locally on your network - data never leaves your home
-- **Easy Setup**: Web-based wizard for first-time configuration
-- **Encrypted Storage**: All credentials encrypted at rest
+### Core Automation
+- **Automatic presence detection** - Multiple methods: ARP (Layer 2), network ping, iOS heartbeat
+- **Manual override** - Instant control via web dashboard (2-hour duration)
+- **Custom schedules** - Time-based rules (weekday/weekend, custom times)
+- **Multi-device support** - Track multiple phones, tablets, etc.
+- **Grace periods** - Prevents false "away" triggers from brief WiFi drops
 
-### Security Features
-- **CSRF Protection**: Cross-Site Request Forgery protection on all state-changing operations
-- **Secure Sessions**: HttpOnly and SameSite cookie flags prevent session hijacking
-- **Rate Limiting**: Automatic throttling on webhook endpoints prevents abuse
-- **SQL Injection Prevention**: Whitelisted database queries ensure data safety
-- **Input Validation**: Sanitized inputs across all user-facing forms
+### Security & Privacy
+- **Runs locally** - Data never leaves your network
+- **Encrypted storage** - All credentials encrypted at rest
+- **Non-root user** - Dedicated service account prevents privilege escalation
+- **CSRF protection** - Secure state-changing operations
+- **Rate limiting** - Prevents webhook abuse
 
 ### User Experience
-- **Responsive Design**: Modern, mobile-friendly interface
-- **Real-time Dashboard**: Auto-refreshing status and activity log
-- **Timezone Support**: Automatic timezone handling for schedules and logs
-- **Consistent Styling**: Standardized UI components throughout application
+- **Responsive dashboard** - Mobile-friendly web interface
+- **Real-time updates** - Auto-refreshing status and activity log
+- **Easy setup wizard** - First-time configuration in browser
+- **Timezone aware** - Automatic handling for schedules and logs
+
+---
+
+## Why a Dedicated User? (Security)
+
+WyzeGuardi runs as the `wyzeguardi` user (not root) because:
+
+- **Limits damage if compromised** - Attackers can't access system files or install malware
+- **Industry standard** - Follows principle of least privilege
+- **Audit trail** - All actions tied to dedicated account, easy to track
+- **File isolation** - Application can only modify its own files
+
+**Installation:** `/opt/wyzeguardi` (system-wide, proper permissions)  
+**Runtime user:** `wyzeguardi` (non-admin, security hardened)
+
+---
 
 ## Installation
 
-### Quick Install (Recommended)
+### Secure Installation (Recommended)
+
+Creates dedicated user, sets permissions, auto-starts on boot:
 
 ```bash
-# 1. Install git if needed
-sudo apt update
-sudo apt install -y git
-
-# 2. Clone repository
 git clone https://github.com/Baslocal/WyzeGuardi.git
 cd WyzeGuardi
-
-# 3. Run automated installer
-bash install.sh
+sudo bash install.sh
 ```
 
-The installer automatically:
-- Installs system dependencies (Python, build tools, etc.)
-- Creates virtual environment
-- Installs Python packages
-- Sets up database
-- Tests server startup
-- Optionally creates systemd service
+**What it does:**
+- Creates `wyzeguardi` system user (non-root)
+- Installs to `/opt/wyzeguardi` with proper permissions
+- Sets up systemd service with security hardening
+- Enables auto-start on boot
 
-### Manual Installation
+**Post-install cleanup:**
+```bash
+# After confirming service works
+cd ~ && rm -rf WyzeGuardi
+```
 
-If you prefer manual setup:
+### Legacy Installation (Not Recommended)
+
+⚠️ **Runs as root** - Only for testing or temporary deployments:
 
 ```bash
-# 1. Install system dependencies
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv build-essential python3-dev libffi-dev libssl-dev
-
-# 2. Clone repository
 git clone https://github.com/Baslocal/WyzeGuardi.git
 cd WyzeGuardi
-
-# 3. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# 4. Install Python packages
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# 5. Start server
-python3 server.py
+bash legacy_install.sh
 ```
+
+| Feature | Secure | Legacy |
+|---------|--------|--------|
+| User | `wyzeguardi` | `root` ⚠️ |
+| Location | `/opt/wyzeguardi` | `~/WyzeGuardi` |
+| Auto-start | ✅ systemd | ❌ Manual |
+| Security | ✅ Hardened | ⚠️ Root access |
+| **Use case** | **Production** | **Testing only** |
+
+---
 
 ## First-Time Setup
 
-1. Open browser: `http://localhost:5000` (or use your server's IP)
-2. Setup wizard will guide you through configuration:
-   - **Wyze Credentials**: Email, password, API key/ID
-   - **Timezone**: Your local timezone
-   - **Thresholds**: When to consider you home/away
-   - **Webhook Secret**: Auto-generated security token
-3. **IMPORTANT**: Save the encryption key shown after setup
-4. Dashboard is now ready to use
+**Prerequisites:** 
+- Wyze account with cameras
+- API credentials from https://developer-api-console.wyze.com/
 
-**Get Wyze API Credentials:**
-- Visit https://developer-api-console.wyze.com/
-- Create an API key and note your API ID
+**Steps:**
 
-## Presence Detection Setup
+1. **Start service**
+   ```bash
+   sudo systemctl start wyzeguardi
+   ```
 
-WyzeGuardi can detect your presence using multiple methods:
+2. **Register admin account**  
+   Open browser: `http://YOUR_SERVER_IP:5000/register`  
+   Create username and strong password
 
-1. **ARP Detection (Recommended)**: Layer 2 MAC address detection - most reliable, no phone setup needed
-2. **Network Ping**: Server pings your phone's IP - works automatically
-3. **Heartbeat**: iOS Shortcut sends periodic updates - optional for additional reliability
+3. **Complete setup wizard**
+   - Enter Wyze email and password
+   - Add API Key and API ID (from Wyze Developer Console)
+   - Set timezone (e.g., America/New_York)
+   - Configure thresholds (defaults: HOME=10min, AWAY=30min)
+   - Save encryption key shown after setup
 
-### ARP Detection (Recommended - No Setup Required)
+4. **Add devices**
+   - Navigate to Device Manager
+   - Click "Add Device"
+   - Enter device name (e.g., "iPhone")
+   - Choose detection method: **`arp_3x`** (recommended - fastest, most reliable)
+   - Save
 
-ARP (Address Resolution Protocol) detects your phone at the MAC address level (Layer 2), making it:
-- **15x faster** than traditional ping (30ms vs 3-9 seconds)
-- **More reliable** - reduces false "away" detections from 20-30% to <2%
-- **Zero configuration** - works automatically when phone joins network
+5. **Verify automation**
+   - Check Dashboard for device status
+   - Leave home network → cameras should turn ON
+   - Return home → cameras should turn OFF
 
-Simply register your device in Device Manager with detection method **arp_3x** (tries 3 times for maximum reliability).
+**Done!** Your cameras now respond to your presence automatically.
 
-### Creating iOS Shortcut (Optional - Additional Reliability)
+---
 
-**Step 1: Create Shortcut**
-1. Open **Shortcuts** app
-2. Tap **+** to create new shortcut
-3. Add action: **Get Contents of URL**
-   - URL: `http://<your-server-ip>:5000/heartbeat?token=<WEBHOOK_SECRET>`
+## Detection Methods
+
+WyzeGuardi offers multiple ways to detect your presence:
+
+| Method | Speed | Reliability | Setup Required |
+|--------|-------|-------------|----------------|
+| **arp_3x** | ~30ms | ⭐⭐⭐⭐⭐ | None |
+| **arp** | ~30ms | ⭐⭐⭐⭐ | None |
+| **ping** | 3-9s | ⭐⭐⭐ | None |
+| **heartbeat** | N/A | ⭐⭐⭐⭐ | iOS Shortcut |
+| **arp_and_heartbeat** | ~30ms | ⭐⭐⭐⭐⭐ | iOS Shortcut |
+| **both** | 3-9s | ⭐⭐⭐⭐ | iOS Shortcut |
+
+**Recommended:** `arp_3x` - No setup required, most reliable
+
+**Optional: iOS Shortcut for heartbeat** (adds redundancy):
+1. Open Shortcuts app → Create new shortcut
+2. Add action: "Get Contents of URL"
+   - URL: `http://YOUR_SERVER_IP:5000/heartbeat?token=YOUR_WEBHOOK_SECRET`
    - Method: GET
-4. Name it "WyzeGuardi Heartbeat"
+3. Create automation: Time of Day → Every 10 minutes
+4. Disable "Ask Before Running"
 
-**Step 2: Create Automation**
-1. Go to **Automation** tab
-2. Tap **+** → **Create Personal Automation**
-3. Choose: **Time of Day** → Every 10 minutes
-4. Add action: **Run Shortcut** → "WyzeGuardi Heartbeat"
-5. Disable "Ask Before Running"
-6. Save
+---
 
-**How Presence Detection Works:**
-- Phone detected (ARP succeeds OR ping succeeds OR heartbeat < 10 min): **HOME** → Cameras OFF
-- Grace period (10-30 min since last detection): **No change** (only for ping/heartbeat modes)
-- Away confirmed (> 30 min since last detection OR ARP fails): **AWAY** → Cameras ON
+## Daily Usage
 
-**Note:** Pure ARP modes (arp_3x, arp) do NOT use grace period - cameras turn ON immediately when device leaves network.
+### Dashboard (`http://YOUR_SERVER_IP:5000`)
 
-## Using the Dashboard
+**Manual control:**
+- Turn Cameras OFF (2h) - Override to keep cameras off
+- Turn Cameras ON (2h) - Override to keep cameras on
 
-### Main Dashboard (`/`)
-
-**Manual Control:**
-- **Turn Cameras OFF (2h)**: Override to keep cameras off
-- **Turn Cameras ON (2h)**: Override to keep cameras on
-- Override expires automatically after duration
-
-**Status Display:**
+**Status display:**
 - Current camera state (on/off)
 - Presence status (HOME/AWAY/GRACE)
 - Online devices count
 - Last heartbeat time
 - Manual override expiration
 
-**Activity Log:**
+**Activity log:**
 - Recent events (camera changes, heartbeats, errors)
 - Auto-refreshes every 30 seconds
 
-### Device Manager (`/devices`)
+### Device Manager
 
-**Register Devices:**
-1. Click "Add Device"
-2. Enter device name (e.g., "iPhone", "iPad")
-3. Choose detection method:
-   - **arp_3x**: ARP with 3 retries (recommended - fastest, most reliable)
-   - **arp**: ARP detection (Layer 2 MAC-based)
-   - **ping**: Network ping only (Layer 3 IP-based)
-   - **heartbeat**: iOS Shortcut only (requires setup)
-   - **arp_and_heartbeat**: Combines ARP + heartbeat (maximum reliability)
-   - **both**: Network ping + heartbeat (legacy method)
-4. Save
+**Add/edit/delete devices:**
+- Register multiple phones, tablets, etc.
+- Choose detection method per device
+- View online/offline status
+- Test detection with "Test" button
 
-**Device Status:**
-- Green: Online (detected recently)
-- Gray: Offline
+### Schedule Manager
 
-### Schedule Manager (`/schedules`)
-
-Create custom time-based schedules:
-
-1. Click "Add Schedule"
-2. Configure:
-   - Name (e.g., "Weekday Work Hours")
-   - Days of week
-   - Time range
-   - Camera state (on/off)
-3. Save
-
-**Examples:**
+**Create time-based rules:**
 - Weekday 8am-6pm: Cameras ON (at work)
 - Weekend 9am-11pm: Cameras OFF (home all day)
-- Night 11pm-7am: Cameras ON (everyone sleeping)
+- Night 11pm-7am: Cameras ON (sleeping)
 
-### Settings (`/settings`)
+Schedules override presence detection during specified times.
 
-**View:**
-- System health metrics
-- Historical statistics
-- Database info
-- Current configuration
+### Settings
 
-**Edit Settings:**
+**View system health:**
+- CPU/memory usage
+- Database statistics
+- Historical activity
+
+**Edit configuration:**
 - Update Wyze credentials
 - Change thresholds (HOME/AWAY timing)
 - Adjust state machine interval
-- Test API connection
+- Test Wyze API connection
 
-## Configuration
+---
 
-### Presence Detection Settings
+## Management
 
-**HOME_THRESHOLD** (default: 10 minutes)
-- How recent heartbeat must be to consider device online
-- Increase if iOS Shortcut runs infrequently
-- Example: Set to 15 min if Shortcut runs every 10 min
-
-**AWAY_THRESHOLD** (default: 30 minutes)
-- Grace period before confirming you're away
-- Prevents cameras turning ON during brief WiFi drops
-- Increase for more tolerance, decrease for faster response
-
-**STATE_MACHINE_INTERVAL** (default: 5 minutes)
-- How often system checks presence and updates cameras
-- Lower = faster response, higher = less frequent API calls
-
-**Configure via:** Settings → Edit Settings
-
-### Detection Methods (Per Device)
-
-- **arp_3x**: ARP detection with 3 retries (~30ms, recommended for most devices)
-- **arp**: Single ARP check (fastest but may miss device during network transitions)
-- **ping**: Network ping via TCP ports (3-9s, works if phone allows connections)
-- **heartbeat**: iOS Shortcut only (requires setup, user must trigger periodically)
-- **arp_and_heartbeat**: Combines ARP + heartbeat (maximum reliability, no grace period)
-- **both**: Network ping + heartbeat (legacy, slower than ARP methods)
-
-**Recommendations:**
-- **iPhone/iPad**: Use **arp_3x** (no setup, most reliable)
-- **Android**: Use **arp_3x** (works with all Android devices)
-- **If ARP fails**: Fall back to **both** or **arp_and_heartbeat** with iOS Shortcut
-
-**Configure via:** Device Manager → Edit device
-
-## Running as Service
-
-The installer can create a systemd service for auto-start:
+### Service Commands
 
 ```bash
-# Service management
-sudo systemctl status wyzeguardi    # Check status
-sudo systemctl restart wyzeguardi   # Restart
-sudo systemctl stop wyzeguardi      # Stop
-sudo systemctl start wyzeguardi     # Start
+# Start/stop/restart
+sudo systemctl start wyzeguardi
+sudo systemctl stop wyzeguardi
+sudo systemctl restart wyzeguardi
 
-# View logs
-sudo journalctl -u wyzeguardi -f    # Live logs
-sudo journalctl -u wyzeguardi -n 50 # Last 50 lines
+# Check status
+sudo systemctl status wyzeguardi
+
+# Enable/disable auto-start
+sudo systemctl enable wyzeguardi   # Auto-start on boot (default)
+sudo systemctl disable wyzeguardi  # Disable auto-start
 ```
+
+### View Logs
+
+```bash
+# Live system logs
+sudo journalctl -u wyzeguardi -f
+
+# Last 50 entries
+sudo journalctl -u wyzeguardi -n 50
+
+# Today's logs
+sudo journalctl -u wyzeguardi --since today
+
+# Application logs
+tail -f /opt/wyzeguardi/server.log
+```
+
+### Configuration
+
+```bash
+# Edit settings
+sudo nano /opt/wyzeguardi/.env
+
+# Apply changes
+sudo systemctl restart wyzeguardi
+```
+
+### Access as wyzeguardi user
+
+```bash
+sudo su - wyzeguardi
+cd /opt/wyzeguardi
+source venv/bin/activate
+```
+
+---
+
+## Cron Job (Optional - Additional Reliability)
+
+Add a cron job for redundant health monitoring:
+
+```bash
+# Edit root crontab
+sudo crontab -e
+
+# Add this line (checks every 5 minutes)
+*/5 * * * * su - wyzeguardi -c "/opt/wyzeguardi/start.sh"
+```
+
+The `start.sh` script:
+- Checks if server is running
+- Auto-restarts if crashed
+- Logs all actions with timestamps
+- Only acts if needed (doesn't duplicate processes)
+
+**When to use:**
+- Production environments requiring maximum uptime
+- Backup to systemd auto-restart
+- Systems with memory issues
+
+---
 
 ## Troubleshooting
 
-### Cameras Not Turning Off When Home
+### Cameras not turning off when home
 
-**Possible Causes:**
-1. **Detection method unreliable** - Ping or heartbeat may be failing
-2. **Network ping blocked** - iPhone may block ping ports in Low Power Mode
-3. **Schedule override** - Active schedule may be controlling cameras
-4. **Device not registered** - Device not added to Device Manager
-
-**Solutions:**
-- **Switch to ARP detection** - Change device to **arp_3x** method (most reliable)
-- Check Device Manager - is your device showing as online?
-- Use Test button on device to verify detection is working
-- If using heartbeat: manually trigger iOS Shortcut to test
-- Check Settings → thresholds (HOME_THRESHOLD may be too short)
-
-### Cameras Not Turning On When Away
-
-**Possible Causes:**
-1. **Still in grace period** - Default 30 min wait before confirming away
-2. **Other device online** - Another registered device still home
-3. **Manual override active** - Check dashboard for override status
-
-**Solutions:**
-- Wait for grace period to expire (check Dashboard for timing)
-- Check Device Manager - disable devices that shouldn't trigger presence
-- Reduce AWAY_THRESHOLD in Settings for faster response
-
-### Heartbeats Not Received
-
-**Check:**
-1. iOS Shortcut URL correct (including token and IP)
-2. iPhone on same network as server
-3. Shortcut automation enabled and running
-4. Check Logs page for heartbeat entries
-
-**Test:**
-- Manually run Shortcut from Shortcuts app
-- Check Dashboard - "Last heartbeat" should update immediately
-- If working: automation trigger issue, check iOS Settings
-
-### Service Won't Start
-
+**Check detection method:**
 ```bash
-# Check logs for error
-sudo journalctl -u wyzeguardi -n 50
-
-# Common issues:
-# - Database locked: Kill any running python3 server.py processes
-# - Missing dependencies: Reinstall with bash install.sh
-# - Permission error: Check file ownership in install directory
+# Switch device to arp_3x in Device Manager
+# This is the most reliable method
 ```
 
-### Wyze API Errors
+**Verify device is online:**
+- Check Device Manager - device should show green (online)
+- Click "Test" button to verify detection works
 
-**"Failed to initialize Wyze client"**
-- Check credentials in Settings → Edit Settings
-- Click "Test Connection" to verify API key/ID
-- Ensure API key is active at https://developer-api-console.wyze.com/
+**Check service status:**
+```bash
+sudo systemctl status wyzeguardi
+sudo journalctl -u wyzeguardi -n 50
+```
 
-**"Client.__init__() got unexpected keyword argument"**
-- wyze-sdk version too old
-- Update: `pip install --upgrade wyze-sdk==2.2.0`
+### Cameras not turning on when away
+
+**Wait for grace period:**
+- Default: 30 minutes after last detection
+- Check Dashboard for "GRACE" status
+
+**Check for other devices:**
+- Another registered device may still be home
+- Review Device Manager for unexpected online devices
+
+**Verify thresholds:**
+```bash
+sudo nano /opt/wyzeguardi/.env
+# Check AWAY_THRESHOLD setting
+```
+
+### Service won't start
+
+**Check logs:**
+```bash
+sudo journalctl -u wyzeguardi -n 50
+```
+
+**Common fixes:**
+```bash
+# Verify Python version (need 3.8+)
+python3 --version
+
+# Reinstall dependencies
+cd /opt/wyzeguardi
+sudo -u wyzeguardi bash -c "source venv/bin/activate && pip install -r requirements.txt"
+
+# Restart service
+sudo systemctl restart wyzeguardi
+```
+
+### Can't access dashboard
+
+**Check service is running:**
+```bash
+sudo systemctl status wyzeguardi
+```
+
+**Verify port 5000 is open:**
+```bash
+sudo netstat -tulpn | grep 5000
+```
+
+**Try localhost:**
+```bash
+# From server itself
+curl http://localhost:5000/status
+```
+
+### Wyze API errors
+
+**Test connection:**
+- Settings → Edit Settings → "Test Connection"
+
+**Update credentials:**
+- Check email/password are correct
+- Verify API Key/ID from https://developer-api-console.wyze.com/
+- Ensure API key is active
+
+**Update wyze-sdk:**
+```bash
+cd /opt/wyzeguardi
+sudo -u wyzeguardi bash -c "source venv/bin/activate && pip install --upgrade wyze-sdk"
+sudo systemctl restart wyzeguardi
+```
+
+### Forgot admin password
+
+```bash
+cd /opt/wyzeguardi
+sudo -u wyzeguardi python3 reset_password.py
+```
+
+---
+
+## Uninstall
+
+### Secure Installation
+
+```bash
+# Stop and remove service
+sudo systemctl stop wyzeguardi
+sudo systemctl disable wyzeguardi
+sudo rm /etc/systemd/system/wyzeguardi.service
+sudo systemctl daemon-reload
+
+# Optional: Backup database
+sudo cp /opt/wyzeguardi/wyze_automation.db ~/wyzeguardi_backup.db
+
+# Remove installation
+sudo rm -rf /opt/wyzeguardi
+
+# Remove user
+sudo userdel wyzeguardi
+
+# Remove cron job (if added)
+sudo crontab -e
+# Delete the WyzeGuardi line
+```
+
+### Legacy Installation
+
+```bash
+# Stop server
+pkill -f "python3.*server.py"
+
+# Optional: Backup database
+cp ~/WyzeGuardi/wyze_automation.db ~/wyzeguardi_backup.db
+
+# Remove installation
+rm -rf ~/WyzeGuardi
+
+# Remove cron job (if added)
+crontab -e
+# Delete the WyzeGuardi line
+```
+
+### Automated Cleanup
+
+```bash
+# If cleanup script is available
+sudo bash cleanup.sh
+```
+
+---
+
+## System Requirements
+
+- **OS:** Debian 10+, Ubuntu 20.04+, Raspberry Pi OS
+- **Python:** 3.8 or higher
+- **RAM:** 512MB minimum, 1GB recommended
+- **Disk:** ~500MB (application + database growth)
+- **Network:** Local network access to Wyze cameras and devices
+- **Privileges:** Root/sudo access for installation
+
+**Hardware:**
+- Raspberry Pi 3/4 (recommended)
+- Any Linux server or VM
+- Low power consumption (~5W idle)
+
+---
+
+## How It Works
+
+**State Machine (runs every 5 minutes):**
+
+1. **Check manual override** → If active, maintain state and exit
+
+2. **Check presence detection:**
+   - Query all registered devices
+   - Try detection methods (ARP, ping, heartbeat)
+   - If ANY device detected → HOME → Cameras OFF
+   - If NO devices detected:
+     - ARP modes: AWAY immediately → Cameras ON
+     - Ping/heartbeat modes: 
+       - Last seen < 30 min → GRACE → No change
+       - Last seen > 30 min → AWAY → Cameras ON
+
+3. **Check schedules (if no presence data):**
+   - Apply time-based rules
+   - Or use default weekday/weekend schedule
+
+4. **Execute state change:**
+   - Update cameras via Wyze API
+   - Log activity
+   - Update dashboard
+
+**Detection speeds:**
+- ARP: ~30ms (Layer 2 MAC detection)
+- Ping: 3-9 seconds (TCP port scan)
+- Heartbeat: Depends on iOS Shortcut interval
+
+---
 
 ## Security Best Practices
 
-- **LAN-only**: Do NOT expose port 5000 to internet
-- **Firewall**: Block external access via router or server firewall
-- **Strong webhook secret**: Use 32+ random characters (auto-generated)
-- **File permissions**: Keep .env and .db_key files private (chmod 600)
-- **Regular updates**: Update dependencies periodically
+- ✅ **LAN-only** - Do NOT expose port 5000 to internet
+- ✅ **Firewall** - Block external access via router/server firewall
+- ✅ **Strong password** - Use complex admin password during registration
+- ✅ **File permissions** - Installer sets 600 on sensitive files automatically
+- ✅ **HTTPS** - Use reverse proxy (nginx/Caddy) if accessing remotely
+- ✅ **Regular updates** - Keep dependencies updated periodically
 
-### Optional: HTTPS Access
+**Optional: HTTPS with reverse proxy**
 
-Use nginx or Caddy as reverse proxy for HTTPS:
-
+Example nginx config:
 ```nginx
 server {
     listen 443 ssl;
     server_name wyze.local;
-
+    
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
-
+    
     location / {
         proxy_pass http://localhost:5000;
         proxy_set_header Host $host;
@@ -349,101 +552,27 @@ server {
 }
 ```
 
-## System Requirements
+---
 
-- **Hardware**: Raspberry Pi 3/4 or any Linux server (512MB+ RAM)
-- **OS**: Debian 10+, Ubuntu 20.04+, Raspberry Pi OS
-- **Python**: 3.8 or higher
-- **Network**: Local network access to Wyze cameras and devices
-- **Disk**: ~100MB for application + database (~10MB/month growth)
+## Support
 
-## API Reference
+- **Issues:** https://github.com/Baslocal/WyzeGuardi/issues
+- **Discussions:** https://github.com/Baslocal/WyzeGuardi/discussions
+- **Documentation:** Check `/Planning` folder for technical details
 
-All endpoints return JSON (except HTML pages).
-
-### Control
-- `GET /manual/on` - Turn cameras ON (2h override)
-- `GET /manual/off` - Turn cameras OFF (2h override)
-- `GET /heartbeat?token=SECRET` - Receive heartbeat (for devices)
-
-### Status
-- `GET /status` - Health check (returns "OK" or "DEGRADED")
-- `GET /api/state` - Current system state
-- `GET /api/cameras` - Camera list with states
-- `GET /api/health/database` - Database health
-- `GET /api/health/wyze` - Wyze API health
-- `GET /api/health/system` - System resources (CPU, memory)
-
-## How It Works
-
-**State Machine (runs every 5 minutes):**
-
-1. **Check Manual Override**
-   - If active: maintain current state, exit
-
-2. **Check Presence Detection**
-   - Get all enabled devices
-   - For each device:
-     - If detection method includes "arp": Try ARP detection (ping + arp -a command, ~30ms)
-     - If detection method includes "ping": Try network ping (TCP ports 62078, 5353, 3689, 3-9s)
-     - If detection method includes "heartbeat": Check last_seen timestamp
-   - If any device online: HOME → Cameras OFF
-   - If no devices online:
-     - For ARP-only modes (arp, arp_3x): AWAY → Cameras ON immediately (no grace period)
-     - For ping/heartbeat modes:
-       - If last seen < 30 min ago: GRACE → No change
-       - If last seen > 30 min ago: AWAY → Cameras ON
-
-3. **Check Schedules (if no presence data)**
-   - Check custom schedules for current time
-   - Or use default weekday/weekend schedule
-   - Apply scheduled camera state
-
-4. **Execute State Change**
-   - If desired state != current state: Update cameras via Wyze API
-   - Log to activity log
-   - Update dashboard
+---
 
 ## License
 
 MIT License - see LICENSE file for details
 
-## Support
-
-- **Issues**: https://github.com/Baslocal/WyzeGuardi/issues
-- **Discussions**: https://github.com/Baslocal/WyzeGuardi/discussions
+---
 
 ## Acknowledgments
 
 - [Wyze SDK](https://github.com/shauntarves/wyze-sdk) - Official Wyze Python library
 - Flask, APScheduler, and all open-source dependencies
-
-## Roadmap
-
-Future enhancements under consideration:
-
-### Security Improvements
-- **Password Strength Validation**: Enforce strong passwords with complexity requirements and common password checking
-- **Environment Variables**: Move sensitive configuration to environment variables for better secrets management
-- **Security Headers**: Add Content-Security-Policy, X-Frame-Options, and other security headers
-- **Enhanced Input Sanitization**: Additional validation layers for device names and user inputs
-
-### Code Quality
-- **Comprehensive Documentation**: Docstrings for all functions with parameter and return type documentation
-- **Type Hints**: Full type annotation coverage for improved IDE support and error detection
-- **Unit Test Coverage**: Automated test suite for critical functionality
-- **Logging Improvements**: Standardized logging levels and enhanced security event logging
-
-### User Experience
-- **Error Handling**: Improved error messages and graceful degradation for API failures
-- **Timezone Consistency**: Centralized timezone configuration across all components
-- **Template Optimization**: Reduced code duplication through reusable components
-
-### Developer Experience
-- **Constants Management**: Extracted magic numbers and strings to configuration
-- **Code Refactoring**: Improved maintainability through better separation of concerns
-
-**Note**: Roadmap items are prioritized based on user feedback and security considerations. Contributions welcome!
+- Built by an engineer tired of iOS Shortcuts notifications
 
 ---
 
